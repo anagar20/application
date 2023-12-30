@@ -1,5 +1,46 @@
 import streamlit as st
 
+# Define custom CSS for the tag cloud
+css = """
+<style>
+    .tag-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .tag-pill {
+        padding: 6px 12px;
+        background-color: #f0f0f0;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: background-color 0.3s, color 0.3s, transform 0.3s;
+        font-family: 'Arial', sans-serif;
+        font-weight: bold;
+    }
+    .tag-pill:hover {
+        background-color: #007BFF;
+        color: white;
+        transform: scale(1.05);
+    }
+</style>
+"""
+
+col1, col2 = st.columns([1,1])
+
+tag_cloud_html = css + '<div class="tag-cloud">'
+
+# Display selected names as a tag cloud
+if selected_names:
+    for name in selected_names:
+        tag_cloud_html += f'<span class="tag-pill">{name}</span>'
+
+tag_cloud_html += '</div>'
+col1.markdown(tag_cloud_html, unsafe_allow_html=True)
+
+col2.markdown(tag_cloud_html, unsafe_allow_html=True)
+
 # Function to display clickable images and buttons
 def display_images(image_data):
     if image_data:
