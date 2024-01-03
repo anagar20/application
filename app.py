@@ -88,5 +88,48 @@ def main():
     if st.button("Refresh Images"):
         st.success("Images refreshed!")
 
+
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
+
+def fetch_url(url):
+    """
+    Function to perform a GET request to the specified URL.
+    """
+    try:
+        response = requests.get(url)
+        return response.text
+    except requests.RequestException as e:
+        return str(e)
+
+def concurrent_requests(urls, max_workers=5):
+    """
+    Makes concurrent API requests to a list of URLs and monitors progress with tqdm.
+    
+    Parameters:
+    urls (list): List of URLs to make requests to.
+    max_workers (int): Maximum number of threads to use for making requests.
+    """
+    results = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {executor.submit(fetch_url, url): url for url in urls}
+
+        for future in tqdm(as_completed(future_to_url), total=len(urls), desc="Fetching URLs"):
+            url = future_to_url[future]
+            try:
+                data = future.result()
+                results.append(data)
+            except Exception as exc:
+                print('%r generated an exception: %s' % (url, exc))
+
+    return results
+
+# Example usage
+urls = ["https://jsonplaceholder.typicode.com/posts/1", "https://jsonplaceholder.typicode.com/posts/2", ...]  # Add more URLs as needed
+responses = concurrent_requests(urls)
+
+
 if __name__ == "__main__":
     main()
