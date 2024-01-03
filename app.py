@@ -93,42 +93,47 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-def fetch_url(url):
+def fetch_url(url_index_tuple):
     """
     Function to perform a GET request to the specified URL.
+    Returns a tuple of (index, response).
     """
+    index, url = url_index_tuple
     try:
         response = requests.get(url)
-        return response.text
+        return index, response.text
     except requests.RequestException as e:
-        return str(e)
+        return index, str(e)
 
 def concurrent_requests(urls, max_workers=5):
     """
     Makes concurrent API requests to a list of URLs and monitors progress with tqdm.
+    Preserves the order of the responses according to the order of URLs.
     
     Parameters:
     urls (list): List of URLs to make requests to.
     max_workers (int): Maximum number of threads to use for making requests.
     """
-    results = []
+    results = [None] * len(urls)  # Pre-allocate a list to hold the results in order
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {executor.submit(fetch_url, url): url for url in urls}
+        # Associate each URL with its index
+        future_to_index = {executor.submit(fetch_url, (index, url)): index for index, url in enumerate(urls)}
 
-        for future in tqdm(as_completed(future_to_url), total=len(urls), desc="Fetching URLs"):
-            url = future_to_url[future]
+        for future in tqdm(as_completed(future_to_index), total=len(urls), desc="Fetching URLs"):
+            index = future_to_index[future]
             try:
-                data = future.result()
-                results.append(data)
+                _, data = future.result()
+                results[index] = data
             except Exception as exc:
-                print('%r generated an exception: %s' % (url, exc))
+                print(f'URL at index {index} generated an exception: {exc}')
 
     return results
 
 # Example usage
 urls = ["https://jsonplaceholder.typicode.com/posts/1", "https://jsonplaceholder.typicode.com/posts/2", ...]  # Add more URLs as needed
 responses = concurrent_requests(urls)
+
 
 
 if __name__ == "__main__":
