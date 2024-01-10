@@ -85,9 +85,13 @@ class APIWrapper:
         self.base_url = base_url
 
     @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))
-    def make_request(self, endpoint, method='get', **kwargs):
+    def make_request(self, endpoint, method='post', **kwargs):
         url = self.base_url + endpoint
-        response = requests.request(method, url, **kwargs)
+
+        if method.lower() == 'post':
+            response = requests.post(url, **kwargs)
+        else:
+            response = requests.request(method, url, **kwargs)
 
         # You can implement your logic to handle response here
         response.raise_for_status()
@@ -97,7 +101,9 @@ class APIWrapper:
 # Usage
 api = APIWrapper('https://api.example.com/')
 try:
-    response = api.make_request('/data', params={'param1': 'value'})
+    payload = {'key1': 'value1', 'key2': 'value2'}
+    headers = {'content-type': 'application/json'}
+    response = api.make_request('/data', method='post', json=payload, headers=headers)
     print(response.json())
 except requests.exceptions.HTTPError as e:
     print(f"Request failed: {e}")
