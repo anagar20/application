@@ -75,3 +75,31 @@ print_gpu_memory()
 # Clear cache (if needed)
 torch.cuda.empty_cache()
 
+
+
+import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+class APIWrapper:
+    def __init__(self, base_url):
+        self.base_url = base_url
+
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))
+    def make_request(self, endpoint, method='get', **kwargs):
+        url = self.base_url + endpoint
+        response = requests.request(method, url, **kwargs)
+
+        # You can implement your logic to handle response here
+        response.raise_for_status()
+
+        return response
+
+# Usage
+api = APIWrapper('https://api.example.com/')
+try:
+    response = api.make_request('/data', params={'param1': 'value'})
+    print(response.json())
+except requests.exceptions.HTTPError as e:
+    print(f"Request failed: {e}")
+
+
