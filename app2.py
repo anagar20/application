@@ -35,3 +35,43 @@ task = loop.create_task(main())
 # Wait for the task to complete (optional)
 rs = loop.run_until_complete(task)
 print('rs', rs)
+
+
+
+import torch
+
+# Assuming you have 3 models: Model1, Model2, Model3
+
+model1 = Model1()  # Initialize model 1
+model2 = Model2()  # Initialize model 2
+model3 = Model3()  # Initialize model 3
+
+# Load the state dictionaries (if applicable)
+model1.load_state_dict(state_dict1)
+model2.load_state_dict(state_dict2)
+model3.load_state_dict(state_dict3)
+
+# Check if a GPU is available and if so, use it
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Function to print current GPU memory usage
+def print_gpu_memory():
+    allocated = torch.cuda.memory_allocated(device) / (1024 ** 3)  # GB
+    print(f"GPU Memory Allocated: {allocated:.2f} GB")
+
+# Move the models to GPU and print memory usage
+model1.to(device)
+print_gpu_memory()
+
+model2.to(device)
+print_gpu_memory()
+
+model3.to(device)
+print_gpu_memory()
+
+# Now all three models are loaded into the GPU
+# You can perform inference or further training as needed
+
+# Clear cache (if needed)
+torch.cuda.empty_cache()
+
