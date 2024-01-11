@@ -77,35 +77,31 @@ torch.cuda.empty_cache()
 
 
 
-import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
+import flair
+from flair.data import Sentence
 
-class APIWrapper:
-    def __init__(self, base_url):
-        self.base_url = base_url
+# Load the NER tagger
+tagger = flair.models.SequenceTagger.load('ner')
 
-    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, max=10))
-    def make_request(self, endpoint, method='post', **kwargs):
-        url = self.base_url + endpoint
+# Example text
+text = """Google LLC is an American multinational technology company that specializes in Internet-related services and products.
+          It was founded in 1998 by Larry Page and Sergey Brin while they were Ph.D. students at Stanford University in California."""
 
-        if method.lower() == 'post':
-            response = requests.post(url, **kwargs)
-        else:
-            response = requests.request(method, url, **kwargs)
+# Preprocessing (if needed)
+# For example, removing extra spaces
+clean_text = " ".join(text.split())
 
-        # You can implement your logic to handle response here
-        response.raise_for_status()
+# Create a Sentence object
+sentence = Sentence(clean_text)
 
-        return response
+# Predict entities
+tagger.predict(sentence)
 
-# Usage
-api = APIWrapper('https://api.example.com/')
-try:
-    payload = {'key1': 'value1', 'key2': 'value2'}
-    headers = {'content-type': 'application/json'}
-    response = api.make_request('/data', method='post', json=payload, headers=headers)
-    print(response.json())
-except requests.exceptions.HTTPError as e:
-    print(f"Request failed: {e}")
+# Print the entities with their types
+for entity in sentence.get_spans('ner'):
+    print(entity)
 
+# If you want to see more detailed information:
+for entity in sentence.get_spans('ner'):
+    print(f"Text: {entity.text}, Start: {entity.start_position}, End: {entity.end_position}, Type: {entity.get_label('ner').value}")
 
