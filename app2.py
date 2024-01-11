@@ -77,31 +77,53 @@ torch.cuda.empty_cache()
 
 
 
-import flair
-from flair.data import Sentence
+from allennlp.predictors.predictor import Predictor
+import allennlp_models.tagging
 
-# Load the NER tagger
-tagger = flair.models.SequenceTagger.load('ner')
+# Load the NER model
+predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/ner-model-2020.02.10.tar.gz")
 
 # Example text
 text = """Google LLC is an American multinational technology company that specializes in Internet-related services and products.
           It was founded in 1998 by Larry Page and Sergey Brin while they were Ph.D. students at Stanford University in California."""
 
-# Preprocessing (if needed)
-# For example, removing extra spaces
-clean_text = " ".join(text.split())
+# Preprocess the text (if necessary)
+# Example: Basic whitespace cleaning
+clean_text = ' '.join(text.split())
 
-# Create a Sentence object
-sentence = Sentence(clean_text)
+# Use the model to predict entities
+predictions = predictor.predict(sentence=clean_text)
 
-# Predict entities
-tagger.predict(sentence)
+# Extract and print entities
+for word, tag in zip(predictions['words'], predictions['tags']):
+    if tag != 'O':  # 'O' tags are for words that aren't named entities
+        print(f"{word}: {tag}")
 
-# Print the entities with their types
-for entity in sentence.get_spans('ner'):
-    print(entity)
 
-# If you want to see more detailed information:
-for entity in sentence.get_spans('ner'):
-    print(f"Text: {entity.text}, Start: {entity.start_position}, End: {entity.end_position}, Type: {entity.get_label('ner').value}")
+import stanza
 
+# Download the English model
+stanza.download('en')
+
+# Create a Stanza pipeline with the NER processor
+nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
+
+# Example text
+text = """Google LLC is an American multinational technology company that specializes in Internet-related services and products.
+          It was founded in 1998 by Larry Page and Sergey Brin while they were Ph.D. students at Stanford University in California."""
+
+# Preprocess the text (if necessary)
+# Example: Basic whitespace cleaning
+clean_text = ' '.join(text.split())
+
+# Process the text
+doc = nlp(clean_text)
+
+# Extract and print entities
+for ent in doc.ents:
+    print(f"{ent.text}: {ent.type}")
+
+# More detailed information
+for i, sentence in enumerate(doc.sentences):
+    for ent in sentence.ents:
+        print(f"Sentence {i+1}, Word: {ent.text}, Type: {ent.type}")
