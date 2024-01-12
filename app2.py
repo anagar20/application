@@ -76,31 +76,27 @@ print_gpu_memory()
 torch.cuda.empty_cache()
 
 import boto3
-from botocore.exceptions import NoCredentialsError
 
-def upload_to_s3(file_name, bucket, object_name=None):
+def delete_folder(bucket_name, folder_path):
     """
-    Upload a file to an S3 bucket
+    Delete a folder in an S3 bucket
 
-    :param file_name: File to upload
-    :param bucket: Bucket to upload to
-    :param object_name: S3 object name. If not specified, file_name is used
-    :return: True if file was uploaded, else False
+    :param bucket_name: Name of the S3 bucket
+    :param folder_path: Path of the folder in the S3 bucket
     """
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(bucket_name)
+    folder_path = folder_path if folder_path.endswith('/') else folder_path + '/'
 
-    # If S3 object_name was not specified, use file_name
-    if object_name is None:
-        object_name = file_name
+    # List and delete objects
+    objects_to_delete = bucket.objects.filter(Prefix=folder_path)
+    delete_keys = {'Objects': [{'Key': obj.key} for obj in objects_to_delete]}
 
-    # Upload the file
-    s3_client = boto3.client('s3')
-    try:
-        s3_client.upload_file(file_name, bucket, object_name)
-        print(f"File {file_name} uploaded to {bucket}/{object_name}")
-        return True
-    except NoCredentialsError:
-        print("Credentials not available")
-        return False
+    if delete_keys['Objects']:
+        bucket.delete_objects(Delete=delete_keys)
+        print(f"Deleted folder {folder_path} from bucket {bucket_name}")
+    else:
+        print(f"No objects found in {folder_path}")
 
 # Example usage
-upload_to_s3('path/to/your/file.txt', 'your-s3-bucket', 'folder/in/bucket/file.txt')
+delete_folder('your-s3-bucket', 'path/to/folder')
