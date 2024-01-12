@@ -75,55 +75,32 @@ print_gpu_memory()
 # Clear cache (if needed)
 torch.cuda.empty_cache()
 
+import boto3
+from botocore.exceptions import NoCredentialsError
 
+def upload_to_s3(file_name, bucket, object_name=None):
+    """
+    Upload a file to an S3 bucket
 
-from allennlp.predictors.predictor import Predictor
-import allennlp_models.tagging
+    :param file_name: File to upload
+    :param bucket: Bucket to upload to
+    :param object_name: S3 object name. If not specified, file_name is used
+    :return: True if file was uploaded, else False
+    """
 
-# Load the NER model
-predictor = Predictor.from_path("https://storage.googleapis.com/allennlp-public-models/ner-model-2020.02.10.tar.gz")
+    # If S3 object_name was not specified, use file_name
+    if object_name is None:
+        object_name = file_name
 
-# Example text
-text = """Google LLC is an American multinational technology company that specializes in Internet-related services and products.
-          It was founded in 1998 by Larry Page and Sergey Brin while they were Ph.D. students at Stanford University in California."""
+    # Upload the file
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.upload_file(file_name, bucket, object_name)
+        print(f"File {file_name} uploaded to {bucket}/{object_name}")
+        return True
+    except NoCredentialsError:
+        print("Credentials not available")
+        return False
 
-# Preprocess the text (if necessary)
-# Example: Basic whitespace cleaning
-clean_text = ' '.join(text.split())
-
-# Use the model to predict entities
-predictions = predictor.predict(sentence=clean_text)
-
-# Extract and print entities
-for word, tag in zip(predictions['words'], predictions['tags']):
-    if tag != 'O':  # 'O' tags are for words that aren't named entities
-        print(f"{word}: {tag}")
-
-
-import stanza
-
-# Download the English model
-stanza.download('en')
-
-# Create a Stanza pipeline with the NER processor
-nlp = stanza.Pipeline(lang='en', processors='tokenize,ner')
-
-# Example text
-text = """Google LLC is an American multinational technology company that specializes in Internet-related services and products.
-          It was founded in 1998 by Larry Page and Sergey Brin while they were Ph.D. students at Stanford University in California."""
-
-# Preprocess the text (if necessary)
-# Example: Basic whitespace cleaning
-clean_text = ' '.join(text.split())
-
-# Process the text
-doc = nlp(clean_text)
-
-# Extract and print entities
-for ent in doc.ents:
-    print(f"{ent.text}: {ent.type}")
-
-# More detailed information
-for i, sentence in enumerate(doc.sentences):
-    for ent in sentence.ents:
-        print(f"Sentence {i+1}, Word: {ent.text}, Type: {ent.type}")
+# Example usage
+upload_to_s3('path/to/your/file.txt', 'your-s3-bucket', 'folder/in/bucket/file.txt')
