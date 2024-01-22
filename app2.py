@@ -1,48 +1,41 @@
-import streamlit as st
-import random
+import aiohttp
+import asyncio
+from PIL import Image
+from io import BytesIO
 
-# Dictionary with keys and lists of names
-data_dict = {
-    "Group 1": ["Alice", "Bob", "Charlie"],
-    "Group 2": ["David", "Eve"],
-    "Group 3": ["Frank", "Grace"],
-}
+async def is_image(url, session):
+    try:
+        async with session.get(url) as response:
+            # Check if the content type indicates an image
+            content_type = response.headers.get('content-type', '').lower()
+            if content_type.startswith('image'):
+                # Optionally, you can also check if the downloaded content is a valid image
+                image_data = await response.read()
+                Image.open(BytesIO(image_data))  # This line will raise an exception if it's not a valid image
+                return True
+            else:
+                return False
+    except Exception as e:
+        print(f"Error checking image for URL {url}: {e}")
+        return False
 
-# Define custom CSS for the tag clouds
-css = """
-<style>
-    .tag-cloud {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .tag-pill {
-        padding: 6px 12px;
-        background-color: #fff;
-        border: 1px solid #ccc;
-        border-radius: 20px;
-        cursor: pointer;
-        transition: background-color 0.3s, color 0.3s, transform 0.3s;
-        font-family: 'Arial', sans-serif;
-        font-weight: bold;
-    }
-    .tag-pill:hover {
-        background-color: #007BFF;
-        color: white;
-        transform: scale(1.05);
-    }
-</style>
-"""
+async def main(urls):
+    async with aiohttp.ClientSession() as session:
+        tasks = [is_image(url, session) for url in urls]
+        results = await asyncio.gather(*tasks)
+        return results
 
-# Create a dictionary to map keys to text colors
-text_color_dict = {key: "#{:02x}{:02x}{:02x}".format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for key in data_dict.keys()}
+# Example list of URLs
+url_list = [
+    'https://example.com/image1.jpg',
+    'https://example.com/not_an_image.txt',
+    'https://example.com/image2.png',
+]
 
-# Display tag clouds for each group with different text colors
-for group, names in data_dict.items():
-    text_color = text_color_dict[group]
-    st.markdown(f'<strong style="color: {text_color};">{group}:</strong>', unsafe_allow_html=True)
-    tag_cloud_html = css + '<div class="tag-cloud">'
-    for name in names:
-        tag_cloud_html += f'<span class="tag-pill" style="color: {text_color};">{name}</span>'
-    tag_cloud_html += '</div>'
-    st.markdown(tag_cloud_html, unsafe_allow_html=True)
+# Run the asynchronous code
+loop = asyncio.get_event_loop()
+results = loop.run_until_complete(main(url_list))
+
+# Display results
+for url, result in zip(url_list, results):
+    print(f"{url} is an image: {result}")
