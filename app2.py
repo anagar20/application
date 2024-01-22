@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+from aiohttp_retry import RetryClient, ExponentialRetry
 from PIL import Image
 from io import BytesIO
 
@@ -20,7 +21,8 @@ async def is_image(url, session):
         return False
 
 async def main(urls):
-    async with aiohttp.ClientSession() as session:
+    retry_options = ExponentialRetry(attempts=3)
+    async with RetryClient(session=aiohttp.ClientSession(), retry_options=retry_options) as session:
         tasks = [is_image(url, session) for url in urls]
         results = await asyncio.gather(*tasks)
         return results
