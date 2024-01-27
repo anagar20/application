@@ -41,3 +41,69 @@ url_list = [
 # Run the asynchronous code
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main(url_list))
+
+
+
+import streamlit as st
+
+# URL or local path to your logo
+logo_url = 'https://banner2.cleanpng.com/20181122/pye/kisspng-logo-fox-channel-fox-networks-group-latin-america-5bf69ff4ca5908.8354122815428894608288.jpg'
+
+title_text = "My Awesome App"
+# Custom CSS to inject for styling the title, removing default padding/margin, and styling the logo
+custom_css = """
+    <style>
+        /* Remove padding and margin from the top of the page */
+        .stApp {
+            padding-top: 0px;
+            margin-top: 0px;
+        }
+
+        /* Custom styling for the logo */
+        .logo {
+            width: 100px;  /* Adjust the size of your logo */
+            height: auto;  /* Maintain aspect ratio */
+            margin: 20px 0;  /* Space above and below the logo */
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Custom styling for the title */
+        .title {
+            color: #ff6347;  /* Title color */
+            font-family: 'Garamond', serif;  /* Font family */
+            font-size: 48px;  /* Font size */
+            font-weight: bold;  /* Font weight */
+            text-align: center;  /* Align text to the center */
+            margin: 10px 0;  /* Space above and below the title */
+        }
+
+        /* Reduce the padding around the markdown container for the title */
+        .markdown-text-container {
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+        }
+
+        /* Reduce the padding around the main block container */
+        .block-container {
+            padding-top: 0px;
+            padding-left: 0px;
+            padding-right: 0px;
+            padding-bottom: 0px;
+        }
+    </style>
+"""
+
+# Inject custom CSS with markdown
+st.markdown(custom_css, unsafe_allow_html=True)
+
+# Display the logo
+st.markdown(f'<img src="{logo_url}" class="logo">', unsafe_allow_html=True)
+
+# Display the title with custom HTML and class for styling
+st.markdown(f'<div class="title">{title_text}</div>', unsafe_allow_html=True)
+
+# Continue with the rest of your Streamlit app
+# ...
+
