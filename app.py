@@ -19,11 +19,15 @@ except Exception as e:
     print(f"Error setting permissions: {e}")
 
 sudo yum groupinstall "Development Tools" -y
-sudo yum install yasm nasm pkgconfig -y
+sudo yum install yasm nasm pkgconfig zlib-devel -y
+sudo amazon-linux-extras install epel -y  # for Amazon Linux 2
+sudo yum install libX11-devel freetype-devel fontconfig-devel libXfixes -y
 cd /usr/local/src
 sudo wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
 sudo tar xjvf ffmpeg-snapshot.tar.bz2
 cd ffmpeg
-sudo ./configure --enable-gpl --enable-nonfree --enable-libmp3lame --enable-libx264
+sudo ./configure --prefix=/usr/local --enable-gpl --enable-nonfree --enable-libx264 --enable-libx265 --enable-libvpx --enable-libtheora --enable-libmp3lame --enable-libfdk-aac --enable-libfreetype --enable-libass --enable-libopus --enable-libvorbis --enable-libvpx --enable-sdl2
 sudo make
 sudo make install
+sudo ldconfig
+
