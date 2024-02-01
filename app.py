@@ -17,3 +17,13 @@ try:
     print(f"Permissions set to 777 for folder and its contents: {folder_path}")
 except Exception as e:
     print(f"Error setting permissions: {e}")
+
+sudo yum groupinstall "Development Tools" -y
+sudo yum install yasm nasm pkgconfig -y
+cd /usr/local/src
+sudo wget https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
+sudo tar xjvf ffmpeg-snapshot.tar.bz2
+cd ffmpeg
+sudo ./configure --enable-gpl --enable-nonfree --enable-libmp3lame --enable-libx264
+sudo make
+sudo make install
