@@ -31,3 +31,28 @@ sudo make
 sudo make install
 sudo ldconfig
 
+
+from pydub import AudioSegment
+
+# Load the audio file
+audio_file = "path/to/your/large_file.wav"
+audio = AudioSegment.from_file(audio_file)
+
+# Define the length of each segment (10 seconds here)
+segment_length_ms = 10 * 1000  # 10 seconds in milliseconds
+
+# Calculate the number of segments
+num_segments = len(audio) // segment_length_ms + (1 if len(audio) % segment_length_ms else 0)
+
+# Split and export each segment
+for i in range(num_segments):
+    start_ms = i * segment_length_ms
+    end_ms = start_ms + segment_length_ms
+    segment = audio[start_ms:end_ms]
+    
+    # Export segment to a new file
+    segment_filename = f"segment_{i+1}.wav"
+    segment.export(segment_filename, format="wav")
+    print(f"Exported {segment_filename}")
+
+
