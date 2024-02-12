@@ -107,3 +107,33 @@ st.markdown(f'<div class="title">{title_text}</div>', unsafe_allow_html=True)
 # Continue with the rest of your Streamlit app
 # ...
 
+
+import shutil
+import os
+
+# List of filenames to be copied
+filenames = [
+    '/path/to/source/file1.txt',
+    '/path/to/source/file2.jpg',
+    '/path/to/source/file3.pdf',
+    # Add more files as needed
+]
+
+# Destination folder where the files should be copied
+destination_folder = '/path/to/destination/folder'
+
+# Ensure the destination folder exists, create if it doesn't
+if not os.path.exists(destination_folder):
+    os.makedirs(destination_folder)
+
+# Copy each file to the destination folder
+for filename in filenames:
+    # Extract the basename (file name with extension) from the file path
+    basename = os.path.basename(filename)
+    # Create the destination path by joining the destination folder and basename
+    destination_path = os.path.join(destination_folder, basename)
+    # Copy the file
+    shutil.copy(filename, destination_path)
+    print(f'Copied {filename} to {destination_path}')
+
+
