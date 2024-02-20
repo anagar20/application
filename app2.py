@@ -136,4 +136,31 @@ for filename in filenames:
     shutil.copy(filename, destination_path)
     print(f'Copied {filename} to {destination_path}')
 
+import streamlit as st
+import os
 
+# Assuming your WAV files are stored in a directory named 'wav_files' in the current working directory
+base_dir = 'wav_files'
+
+# List of speakers and categories
+speakers = ['speaker1', 'speaker2', 'speaker3']
+categories = ['category1', 'category2', 'category3']
+
+for speaker in speakers:
+    st.header(speaker)
+    for category in categories:
+        st.subheader(category)
+        
+        # Construct the path to the category folder
+        category_path = os.path.join(base_dir, speaker, category)
+        
+        # List all WAV files in this category
+        try:
+            wav_files = [f for f in os.listdir(category_path) if f.endswith('.wav')]
+        except FileNotFoundError:
+            st.write(f"No files found for {category} in {speaker}.")
+            continue
+        
+        # Display each WAV file with Streamlit's audio widget
+        for wav_file in wav_files:
+            st.audio(os.path.join(category_path, wav_file))
