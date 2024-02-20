@@ -164,3 +164,43 @@ for speaker in speakers:
         # Display each WAV file with Streamlit's audio widget
         for wav_file in wav_files:
             st.audio(os.path.join(category_path, wav_file))
+
+
+import streamlit as st
+import os
+
+# Assuming you have a directory named 'audio_files' structured as mentioned
+BASE_DIR = 'audio_files'
+SPEAKERS = ['speaker1', 'speaker2', 'speaker3']
+CATEGORIES = ['category1', 'category2', 'category3']
+
+def display_audio_files(speaker, category):
+    """Display audio files for a given speaker and category."""
+    # Construct the path to the category directory
+    category_dir = os.path.join(BASE_DIR, speaker, category)
+    
+    # Get all .wav files in this directory
+    try:
+        files = [f for f in os.listdir(category_dir) if f.endswith('.wav')]
+    except FileNotFoundError:
+        st.error(f"Directory {category_dir} not found.")
+        return
+    
+    # Display the files in 4 columns
+    cols = st.columns(4)
+    for index, file in enumerate(files):
+        with cols[index % 4]:
+            st.audio(os.path.join(category_dir, file))
+
+def app():
+    """Main function to display the Streamlit app."""
+    st.title('Audio File Display')
+
+    for speaker in SPEAKERS:
+        st.header(f'Speaker: {speaker}')
+        for category in CATEGORIES:
+            st.subheader(f'Category: {category}')
+            display_audio_files(speaker, category)
+
+if __name__ == "__main__":
+    app()
