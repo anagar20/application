@@ -202,5 +202,38 @@ def app():
             st.subheader(f'Category: {category}')
             display_audio_files(speaker, category)
 
+import plotly.graph_objects as go
+from scipy.io import wavfile
+import numpy as np
+
+# Path to your WAV file
+wav_file_path = 'path/to/your/audio.wav'
+
+# Load the WAV file
+sample_rate, data = wavfile.read(wav_file_path)
+
+# If stereo, just pick one channel
+if len(data.shape) > 1:
+    data = data[:, 0]
+
+# Calculate the time axis in seconds
+time = np.linspace(0, len(data) / sample_rate, num=len(data))
+
+# Create a plotly figure
+fig = go.Figure()
+
+# Add the waveform trace to the figure
+fig.add_trace(go.Scatter(x=time, y=data, mode='lines', name='Waveform'))
+
+# Update the layout
+fig.update_layout(title='Waveform of the Audio File',
+                  xaxis_title='Time (s)',
+                  yaxis_title='Amplitude',
+                  template='plotly_dark')
+
+# Show the plot
+fig.show()
+
+
 if __name__ == "__main__":
     app()
