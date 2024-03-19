@@ -237,38 +237,40 @@ fig.show()
 import os
 from spleeter.separator import Separator
 import shutil
+from tqdm import tqdm
 
 def separate_vocals(input_folder, output_folder):
     # Create a separator object for 2 stems: vocals and accompaniment
     separator = Separator('spleeter:2stems')
     
-    # Walk through the input directory
+    # Prepare a list of MP3 files for processing
+    mp3_files = []
     for root, dirs, files in os.walk(input_folder):
         for file in files:
-            # Check if the file is an MP3 file
             if file.endswith('.mp3'):
-                input_path = os.path.join(root, file)
-                
-                # Generate output path by replacing input folder name with output folder name
-                # and changing file extension to .wav for the vocal file
-                output_path = os.path.join(root.replace(input_folder, output_folder), file[:-4])
-                
-                # Ensure the output directory exists
-                os.makedirs(output_path, exist_ok=True)
-                
-                # Process the file
-                separator.separate_to_file(input_path, output_path)
-                
-                # Move the vocals file to maintain the folder structure and change extension to .wav
-                original_vocal_path = os.path.join(output_path, 'vocals.wav')
-                target_vocal_path = original_vocal_path.replace(output_folder, output_folder)
-                
-                # Check if vocal file exists to avoid errors and move it
-                if os.path.exists(original_vocal_path):
-                    shutil.move(original_vocal_path, target_vocal_path)
-                
-                # Optionally, clean up the accompaniment file and empty directories if needed
-                shutil.rmtree(output_path)
+                mp3_files.append(os.path.join(root, file))
+    
+    # Process each file with progress tracking
+    for file_path in tqdm(mp3_files, desc="Extracting vocals"):
+        input_path = file_path
+        output_path = os.path.join(file_path.replace(input_folder, output_folder), os.path.splitext(os.path.basename(file_path))[0])
+        
+        # Ensure the output directory exists
+        os.makedirs(output_path, exist_ok=True)
+        
+        # Process the file
+        separator.separate_to_file(input_path, output_path)
+        
+        # Move the vocals file to maintain the folder structure and change extension to .wav
+        original_vocal_path = os.path.join(output_path, 'vocals.wav')
+        target_vocal_path = original_vocal_path.replace(output_folder, output_folder) + ".wav"
+        
+        # Check if vocal file exists to avoid errors and move it
+        if os.path.exists(original_vocal_path):
+            shutil.move(original_vocal_path, target_vocal_path)
+        
+        # Optionally, clean up the accompaniment file and empty directories if needed
+        shutil.rmtree(output_path)
 
 # Specify the input and output folders here
 input_folder = 'path/to/your/input/folder'
