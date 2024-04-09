@@ -279,6 +279,25 @@ output_folder = 'path/to/your/output/folder'
 # Call the function to start the process
 separate_vocals(input_folder, output_folder)
 
+#!/bin/bash
+
+set -e
+
+# Mount EFS file system
+EFS_MOUNT_DIR=/mnt/efs
+EFS_FILE_SYSTEM_ID=your-filesystem-id
+REGION=aws-region
+
+# Make the directory if it doesn't exist
+mkdir -p ${EFS_MOUNT_DIR}
+
+# Mount the EFS file system
+mount -t efs -o tls ${EFS_FILE_SYSTEM_ID}:/ ${EFS_MOUNT_DIR}
+
+# Ensure all users can read, write, and execute files
+chmod go+rw ${EFS_MOUNT_DIR}
+
+
 
 
 if __name__ == "__main__":
