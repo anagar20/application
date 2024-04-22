@@ -272,30 +272,90 @@ def separate_vocals(input_folder, output_folder):
         # Optionally, clean up the accompaniment file and empty directories if needed
         shutil.rmtree(output_path)
 
-# Specify the input and output folders here
-input_folder = 'path/to/your/input/folder'
-output_folder = 'path/to/your/output/folder'
 
-# Call the function to start the process
-separate_vocals(input_folder, output_folder)
 
-#!/bin/bash
+import torch
+from transformers import OwlViTProcessor, OwlViTForObjectDetection
+from PIL import Image, ImageDraw
+import numpy as np
 
-set -e
+def load_model():
+    model_id = "google/owlvit-base-patch32"  # Choose appropriate model variant
+    model = OwlViTForObjectDetection.from_pretrained(model_id)
+    processor = OwlViTProcessor.from_pretrained(model_id)
+    return model, processor
 
-# Mount EFS file system
-EFS_MOUNT_DIR=/mnt/efs
-EFS_FILE_SYSTEM_ID=your-filesystem-id
-REGION=aws-region
+def iou(box1, box2):
+    """Calculate Intersection Over Union (IOU) between two bounding boxes."""
+    x1, y1, x2, y2 = box1
+    x1_prime, y1_prime, x2_prime, y2_prime = box2
 
-# Make the directory if it doesn't exist
-mkdir -p ${EFS_MOUNT_DIR}
+    xi1 = max(x1, x1_prime)
+    yi1 = max(y1, y1_prime)
+    xi2 = min(x2, x2_prime)
+    yi2 = min(y2, y2_prime)
 
-# Mount the EFS file system
-mount -t efs -o tls ${EFS_FILE_SYSTEM_ID}:/ ${EFS_MOUNT_DIR}
+    inter_area = max(0, xi2 - xi1) * max(0, yi2 - yi1)
+    box1_area = (x2 - x1) * (y2 - y1)
+    box2_area = (x2_prime - x2_prime) * (y2_prime - y1_prime)
+    union_area = box1_area + box2_area - inter_area
+    return inter_area / union_area
 
-# Ensure all users can read, write, and execute files
-chmod go+rw ${EFS_MOUNT_DIR}
+def non_maximum_suppression(scores, boxes, iou_threshold):
+    idxs = np.argsort(scores)
+    pick = []
+
+    while len(idxs) > 0:
+        last = len(idxs) - 1
+        i = idxs[last]
+        pick.append(i)
+        suppress = [last]
+
+        for pos in range(0, last):
+            j = idxs[pos]
+            if iou(boxes[i], boxes[j]) > iou_threshold:
+                suppress.append(pos)
+
+        idxs = np.delete(idxs, suppress)
+
+    return pick
+
+def predict(image_path, model, processor, threshold=0.9, iou_thresh=0.5):
+    image = Image.open(image_path)
+    inputs = processor(images=image, return_tensors="pt")
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    target_sizes = torch.tensor([image.size[::-1]])
+    results = processor.post_process_object_detection(outputs, target_sizes=target_sizes, threshold=threshold)[0]
+
+    # Apply Non-Maximum Suppression
+    keep = non_maximum_suppression(results["scores"], results["boxes"], iou_thresh)
+    results = {key: [value[i] for i in keep] for key, value in results.items()}
+    return results
+
+def display_results(image_path, results):
+    image = Image.open(image_path)
+    draw = ImageDraw.Draw(image)
+
+    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        box = [round(b) for b in box.tolist()]
+        draw.rectangle(box, outline="red", width=3)
+        draw.text((box[0], box[1]), f"{label} {score:.2f}", fill="red")
+
+    image.show()
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python object_detection.py <image_path>")
+        sys.exit(1)
+
+    image_path = sys.argv[1]
+    model, processor = load_model()
+    results = predict(image_path, model, processor)
+    display_results(image_path, results)
 
 
 
