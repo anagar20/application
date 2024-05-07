@@ -409,6 +409,87 @@ print(anomalous_transactions)
 
 # Further investigation can be done by grouping data or cross-checking details
 
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the Excel data into a pandas DataFrame
+file_path = "employee_transactions.xlsx"
+df = pd.read_excel(file_path)
+
+# Inspect the first few rows and data types
+print(df.head())
+print(df.info())
+
+# Step 2: Data Cleaning
+# Check for missing values and duplicates
+missing_values = df.isnull().sum()
+duplicates = df.duplicated().sum()
+print(f"Missing Values:\n{missing_values}")
+print(f"Duplicated Rows: {duplicates}")
+
+# Drop duplicates and handle missing values if necessary
+df.drop_duplicates(inplace=True)
+df.fillna(value={"transaction_amount": 0}, inplace=True)  # Example for handling missing numeric values
+
+# Convert transaction date to datetime format if not already
+df['transaction_date'] = pd.to_datetime(df['transaction_date'])
+
+# Step 3: Exploratory Data Analysis (EDA)
+# Describe numeric columns
+print(df.describe())
+
+# Aggregation: Total transaction amount per employee
+employee_summary = df.groupby('employee_id')['transaction_amount'].sum()
+print(employee_summary)
+
+# Distribution of transaction amounts
+sns.histplot(df['transaction_amount'], bins=20, kde=True)
+plt.title('Distribution of Transaction Amounts')
+plt.xlabel('Amount')
+plt.ylabel('Frequency')
+plt.show()
+
+# Step 4: Identify Anomalies
+# Example: Transactions above a certain threshold
+threshold = 10000
+high_value_transactions = df[df['transaction_amount'] > threshold]
+print("High Value Transactions:\n", high_value_transactions)
+
+# Example: Multiple transactions to the same vendor within a short time
+df['transaction_date_diff'] = df.groupby('vendor_id')['transaction_date'].diff().dt.days
+short_interval = df[(df['transaction_date_diff'] <= 2) & (df['transaction_date_diff'] > 0)]
+print("Short Interval Transactions:\n", short_interval)
+
+# Example: Transactions outside regular business hours
+df['hour'] = df['transaction_date'].dt.hour
+outside_hours = df[(df['hour'] < 8) | (df['hour'] > 18)]
+print("Outside Business Hours Transactions:\n", outside_hours)
+
+# Example: Benford's Law analysis
+leading_digit = df['transaction_amount'].astype(str).str[0].astype(int)
+benford_distribution = leading_digit.value_counts(normalize=True).sort_index()
+expected_distribution = np.array([np.log10(1 + 1 / d) for d in range(1, 10)])
+plt.bar(range(1, 10), benford_distribution, label='Observed')
+plt.plot(range(1, 10), expected_distribution, marker='o', linestyle='--', color='red', label='Expected')
+plt.title("Benford's Law Analysis")
+plt.xlabel('Leading Digit')
+plt.ylabel('Frequency')
+plt.legend()
+plt.show()
+
+# Step 5: Document and Visualize Findings
+# Save results of suspicious transactions to a new Excel file
+suspicious_transactions = pd.concat([high_value_transactions, short_interval, outside_hours]).drop_duplicates()
+suspicious_transactions.to_excel("suspicious_transactions.xlsx", index=False)
+
+# Generate a summary report (in this case, simply printing to the console)
+print("Summary Report:")
+print(f"High Value Transactions: {len(high_value_transactions)}")
+print(f"Short Interval Transactions: {len(short_interval)}")
+print(f"Outside Business Hours Transactions: {len(outside_hours)}")
 
 
 if __name__ == "__main__":
