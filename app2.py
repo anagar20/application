@@ -358,6 +358,57 @@ if __name__ == "__main__":
     display_results(image_path, results)
 
 
+# Import required libraries
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import IsolationForest
+import matplotlib.pyplot as plt
+
+# Load data from Excel (replace 'transactions.xlsx' with your file)
+file_path = 'transactions.xlsx'
+df = pd.read_excel(file_path)
+
+# Explore the data - identify columns and first few rows
+print(df.head())
+print(df.info())
+
+# Clean and preprocess the data (customize according to your specific dataset)
+# Example: Handle missing values
+df.fillna(method='ffill', inplace=True)
+
+# Convert date/time fields if necessary
+df['transaction_date'] = pd.to_datetime(df['transaction_date'])
+
+# Example statistical analysis (descriptive statistics)
+print(df.describe())
+
+# Define thresholds to mark potential fraudulent activities (custom criteria)
+high_value_threshold = df['amount'].quantile(0.95)  # Transactions in top 5% by value
+
+# Flag transactions greater than threshold
+df['potential_fraud'] = df['amount'] > high_value_threshold
+
+# Anomaly detection using Isolation Forest
+clf = IsolationForest(n_estimators=100, contamination=0.05, random_state=42)
+clf.fit(df[['amount']])
+df['anomaly'] = clf.predict(df[['amount']])
+df['anomaly'] = df['anomaly'].map({1: 'normal', -1: 'anomaly'})
+
+# Visualization of anomalies
+plt.figure(figsize=(10, 6))
+plt.scatter(df.index, df['amount'], c=(df['anomaly'] == 'anomaly'), cmap='coolwarm', label='Anomalous Transactions')
+plt.xlabel('Index')
+plt.ylabel('Transaction Amount')
+plt.legend()
+plt.show()
+
+# Document findings
+# Filter out only flagged transactions
+anomalous_transactions = df[df['anomaly'] == 'anomaly']
+print(anomalous_transactions)
+
+# Further investigation can be done by grouping data or cross-checking details
+
 
 
 if __name__ == "__main__":
