@@ -59,54 +59,96 @@ for i in range(num_segments):
 
 
 
+import logging
 from opensearchpy import OpenSearch, exceptions
 
-# Configuration: replace with your server details
-host = 'https://your-opensearch-cluster-endpoint'
-port = 443  # or another port if you use one
-auth = ('username', 'password')  # HTTP basic authentication
+class OpenSearchIndexManager:
+    def __init__(self, host, port, username, password, index_name):
+        self.host = host
+        self.port = port
+        self.auth = (username, password)
+        self.index_name = index_name
+        self.client = self._create_client()
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
 
-# Initialize the OpenSearch client
-client = OpenSearch(
-    hosts=[{'host': host, 'port': port}],
-    http_compress=True,  # enables gzip compression for request bodies
-    http_auth=auth,
-    use_ssl=True,
-    verify_certs=True,
-    ssl_assert_hostname=False,
-    ssl_show_warn=False,
-)
+    def _create_client(self):
+        return OpenSearch(
+            hosts=[{'host': self.host, 'port': self.port}],
+            http_auth=self.auth,
+            use_ssl=True,
+            verify_certs=True,
+            ssl_assert_hostname=False,
+            ssl_show_warn=False,
+            http_compress=True
+        )
 
-# Verify if index exists
-index_name = 'your_index_name'
-if not client.indices.exists(index=index_name):
-    print("Index named '{}' does not exist.".format(index_name))
-else:
-    # Define the query
-    query = {
-        'query': {
-            'match': {
-                'text_field_name': 'search text'
-            }
-        }
-    }
-
-    # Perform the search
-    response = client.search(index=index_name, body=query)
-    total_hits = response['hits']['total']['value']
-    print("Total records matching the query:", total_hits)
-
-    # If there are hits, delete them
-    if total_hits > 0:
+    def create_index(self, index_body):
+        if self.client.indices.exists(index=self.index_name):
+            self.logger.info(f"Index {self.index_name} already exists.")
+            return
         try:
-            delete_response = client.delete_by_query(index=index_name, body=query, refresh=True)
-            print("Deleted records count:", delete_response['deleted'])
-        except exceptions.TransportError as e:
-            print(f"TransportError occurred: Status code={e.status_code}, error={e.info}")
-        except exceptions.OpenSearchException as e:
-            print(f"OpenSearch exception occurred: {e.info}")
+            response = self.client.indices.create(index=self.index_name, body=index_body)
+            self.logger.info("Index created successfully.")
+            self.logger.debug(f"Response: {response}")
+        except exceptions.RequestError as e:
+            self.logger.error(f"Request Error: {e.info}")
+        except exceptions.ConnectionError as e:
+            self.logger.error(f"Connection Error: {e.info}")
         except Exception as e:
-            print(f"An unexpected error occurred: {str(e)}")
-    else:
-        print("No records to delete.")
+            self.logger.error(f"An unexpected error occurred: {str(e)}")
 
+    def delete_index(self):
+        try:
+            response = self.client.indices.delete(index=self.index_name)
+            self.logger.info("Index deleted successfully.")
+            self.logger.debug(f"Response: {response}")
+        except exceptions.NotFoundError:
+            self.logger.error("Index not found.")
+        except exceptions.RequestError as e:
+            self.logger.error(f"Request Error: {e.info}")
+        except Exception as e:
+            self.logger.error(f"An unexpected error occurred: {str(e)}")
+
+    def query_index(self, query):
+        try:
+            response = self.client.search(index=self.index_name, body={"query": query})
+            self.logger.info(f"Query executed successfully.")
+            return response
+        except exceptions.RequestError as e:
+            self.logger.error(f"Request Error: {e.info}")
+        except exceptions.ConnectionError as e:
+            self.logger.error(f"Connection Error: {e.info}")
+        except Exception as e:
+            self.logger.error(f"An unexpected error occurred: {str(e)}")
+            return None
+
+    def delete_documents_by_query(self, query):
+        try:
+            response = self.client.delete_by_query(index=self.index_name, body={"query": query}, refresh=True)
+            self.logger.info(f"Documents deleted successfully. Total deleted: {response['deleted']}")
+        except exceptions.RequestError as e:
+            self.logger.error(f"Request Error: {e.info}")
+        except exceptions.ConnectionError as e:
+            self.logger.error(f"Connection Error: {e.info}")
+        except Exception as e:
+            self.logger.error(f"An unexpected error occurred: {str(e)}")
+
+# Example usage of the class:
+if __name__ == "__main__":
+    index_manager = OpenSearchIndexManager(
+        host='https://your-opensearch-cluster-endpoint',
+        port=443,
+        username='your_username',
+        password='your_password',
+        index_name='your_index_name'
+    )
+
+    # Assuming index is already created, here's how you could query and delete documents:
+    query = {"match": {"face_string": "example"}}
+    # Query the index
+    search_results = index_manager.query_index(query)
+    print(search_results)
+
+    # Delete documents matching the query
+    index_manager.delete_documents_by_query(query)
