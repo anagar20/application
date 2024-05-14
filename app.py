@@ -134,6 +134,16 @@ class OpenSearchIndexManager:
         except Exception as e:
             self.logger.error(f"An unexpected error occurred: {str(e)}")
 
+    def get_opensearch_version(self):
+        try:
+            info = self.client.info()
+            version = info['version']['number']
+            self.logger.info(f"OpenSearch version: {version}")
+            return version
+        except Exception as e:
+            self.logger.error(f"Failed to retrieve OpenSearch version: {str(e)}")
+            return None
+
 # Example usage of the class:
 if __name__ == "__main__":
     index_manager = OpenSearchIndexManager(
