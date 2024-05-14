@@ -64,85 +64,98 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
+import os
 
-class CSVFilterApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("CSV Filter and Export Tool")
+def load_csv():
+    # Manually specify the CSV file path
+    file_path = "path/to/your/data.csv"
+    df = pd.read_csv(file_path)
+    return df
 
-        # Load CSV Button
-        ttk.Button(self.root, text="Load CSV", command=self.load_csv).grid(row=0, column=0, padx=10, pady=10)
+def create_scrollable_frame(parent):
+    # Create a canvas with a scrollbar
+    canvas = tk.Canvas(parent)
+    scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+    scrollable_frame = ttk.Frame(canvas)
 
-        # Frame for Date Checkboxes
-        self.date_frame = ttk.LabelFrame(self.root, text="Select Dates")
-        self.date_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='ew')
-        self.date_vars = {}
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")
+        )
+    )
 
-        # Frame for Column Checkboxes
-        self.column_frame = ttk.LabelFrame(self.root, text="Select Columns")
-        self.column_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky='ew')
-        self.column_vars = {}
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
 
-        # Submit Button for filtering data
-        ttk.Button(self.root, text="Filter Data", command=self.filter_data).grid(row=3, column=0, columnspan=2, padx=10, pady=10)
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
 
-    def load_csv(self):
-        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
-        if not file_path:
-            return
-        self.df = pd.read_csv(file_path)
+    return scrollable_frame
 
-        # Process dates for checkboxes
-        self.show_date_checkboxes()
-        self.show_column_checkboxes()
+def create_date_checkboxes(df, frame):
+    # Create checkboxes for each unique date
+    unique_dates = sorted(df['Date'].unique())
+    date_vars = {}
+    for date in unique_dates:
+        var = tk.BooleanVar()
+        chk = ttk.Checkbutton(frame, text=date, variable=var)
+        chk.pack(anchor='w')
+        date_vars[date] = var
+    return date_vars
 
-    def show_date_checkboxes(self):
-        # Clear previous checkboxes if any
-        for widget in self.date_frame.winfo_children():
-            widget.destroy()
+def create_column_checkboxes(df, frame):
+    # Create new checkboxes for each column in the DataFrame
+    column_vars = {}
+    for column in df.columns:
+        var = tk.BooleanVar()
+        chk = ttk.Checkbutton(frame, text=column, variable=var)
+        chk.pack(anchor='w')
+        column_vars[column] = var
+    return column_vars
 
-        # Create checkboxes for each unique date
-        unique_dates = sorted(self.df['Date'].unique())
-        for date in unique_dates:
-            var = tk.BooleanVar()
-            chk = ttk.Checkbutton(self.date_frame, text=date, variable=var)
-            chk.pack(anchor='w')
-            self.date_vars[date] = var
+def filter_data(df, date_vars, column_vars, root):
+    # Filter data based on selected dates
+    selected_dates = [date for date, var in date_vars.items() if var.get()]
+    mask = df['Date'].isin(selected_dates)
+    filtered_data = df.loc[mask]
 
-    def show_column_checkboxes(self):
-        # Clear previous checkboxes if any
-        for widget in self.column_frame.winfo_children():
-            widget.destroy()
+    # Filter data based on selected columns
+    selected_columns = [col for col, var in column_vars.items() if var.get()]
+    filtered_data = filtered_data[selected_columns]
 
-        # Create new checkboxes for each column in the DataFrame
-        for column in self.df.columns:
-            var = tk.BooleanVar()
-            chk = ttk.Checkbutton(self.column_frame, text=column, variable=var)
-            chk.pack(anchor='w')
-            self.column_vars[column] = var
+    # Automatically save the filtered DataFrame to a new CSV file
+    output_file = "filtered_data.csv"
+    filtered_data.to_csv(output_file, index=False)
+    messagebox.showinfo("Success", f"Filtered CSV has been saved as {output_file}.")
+    root.destroy()
 
-    def filter_data(self):
-        # Filter data based on selected dates
-        selected_dates = [date for date, var in self.date_vars.items() if var.get()]
-        mask = self.df['Date'].isin(selected_dates)
-        filtered_data = self.df.loc[mask]
-
-        # Filter data based on selected columns
-        selected_columns = [col for col, var in self.column_vars.items() if var.get()]
-        filtered_data = filtered_data[selected_columns]
-
-        # Save the filtered DataFrame to a new CSV file
-        output_file = filedialog.asksaveasfilename(filetypes=[("CSV files", "*.csv")], defaultextension=".csv")
-        if output_file:
-            filtered_data.to_csv(output_file, index=False)
-            messagebox.showinfo("Success", "Filtered CSV has been saved.")
-
-def main():
+def setup_gui(df):
     root = tk.Tk()
-    app = CSVFilterApp(root)
+    root.title("CSV Filter and Export Tool")
+
+    # Scrollable Frame for Date Checkboxes
+    date_frame = ttk.LabelFrame(root, text="Select Dates")
+    date_frame.grid(row=0, column=0, padx=10, pady=10, sticky='ew')
+    scrollable_date_frame = create_scrollable_frame(date_frame)
+
+    # Scrollable Frame for Column Checkboxes
+    column_frame = ttk.LabelFrame(root, text="Select Columns")
+    column_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ew')
+    scrollable_column_frame = create_scrollable_frame(column_frame)
+
+    # Load data and create checkboxes
+    date_vars = create_date_checkboxes(df, scrollable_date_frame)
+    column_vars = create_column_checkboxes(df, scrollable_column_frame)
+
+    # Submit Button for filtering data
+    ttk.Button(root, text="Filter Data", command=lambda: filter_data(df, date_vars, column_vars, root)).grid(row=2, column=0, padx=10, pady=10)
+
     root.mainloop()
 
 if __name__ == "__main__":
-    main()
+    df = load_csv()
+    setup_gui(df)
+
 
 
