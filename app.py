@@ -101,10 +101,12 @@ else:
         try:
             delete_response = client.delete_by_query(index=index_name, body=query, refresh=True)
             print("Deleted records count:", delete_response['deleted'])
-        except exceptions.NotFoundError:
-            print("Error: The resource was not found.")
+        except exceptions.TransportError as e:
+            print(f"TransportError occurred: Status code={e.status_code}, error={e.info}")
+        except exceptions.OpenSearchException as e:
+            print(f"OpenSearch exception occurred: {e.info}")
         except Exception as e:
-            print("An error occurred:", str(e))
+            print(f"An unexpected error occurred: {str(e)}")
     else:
         print("No records to delete.")
 
