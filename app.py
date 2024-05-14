@@ -59,103 +59,52 @@ for i in range(num_segments):
 
 
 
+from opensearchpy import OpenSearch, exceptions
 
-import pandas as pd
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
-import os
+# Configuration: replace with your server details
+host = 'https://your-opensearch-cluster-endpoint'
+port = 443  # or another port if you use one
+auth = ('username', 'password')  # HTTP basic authentication
 
-def load_csv():
-    # Manually specify the CSV file path
-    file_path = "path/to/your/data.csv"
-    df = pd.read_csv(file_path)
-    return df
+# Initialize the OpenSearch client
+client = OpenSearch(
+    hosts=[{'host': host, 'port': port}],
+    http_compress=True,  # enables gzip compression for request bodies
+    http_auth=auth,
+    use_ssl=True,
+    verify_certs=True,
+    ssl_assert_hostname=False,
+    ssl_show_warn=False,
+)
 
-def create_scrollable_frame(parent):
-    # Create a canvas with a scrollbar
-    canvas = tk.Canvas(parent)
-    scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-    scrollable_frame = ttk.Frame(canvas)
+# Verify if index exists
+index_name = 'your_index_name'
+if not client.indices.exists(index=index_name):
+    print("Index named '{}' does not exist.".format(index_name))
+else:
+    # Define the query
+    query = {
+        'query': {
+            'match': {
+                'text_field_name': 'search text'
+            }
+        }
+    }
 
-    scrollable_frame.bind(
-        "<Configure>",
-        lambda e: canvas.configure(
-            scrollregion=canvas.bbox("all")
-        )
-    )
+    # Perform the search
+    response = client.search(index=index_name, body=query)
+    total_hits = response['hits']['total']['value']
+    print("Total records matching the query:", total_hits)
 
-    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-    canvas.configure(yscrollcommand=scrollbar.set)
-
-    canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
-
-    return scrollable_frame
-
-def create_date_checkboxes(df, frame):
-    # Create checkboxes for each unique date
-    unique_dates = sorted(df['Date'].unique())
-    date_vars = {}
-    for date in unique_dates:
-        var = tk.BooleanVar()
-        chk = ttk.Checkbutton(frame, text=date, variable=var)
-        chk.pack(anchor='w')
-        date_vars[date] = var
-    return date_vars
-
-def create_column_checkboxes(df, frame):
-    # Create new checkboxes for each column in the DataFrame
-    column_vars = {}
-    for column in df.columns:
-        var = tk.BooleanVar()
-        chk = ttk.Checkbutton(frame, text=column, variable=var)
-        chk.pack(anchor='w')
-        column_vars[column] = var
-    return column_vars
-
-def filter_data(df, date_vars, column_vars, root):
-    # Filter data based on selected dates
-    selected_dates = [date for date, var in date_vars.items() if var.get()]
-    mask = df['Date'].isin(selected_dates)
-    filtered_data = df.loc[mask]
-
-    # Filter data based on selected columns
-    selected_columns = [col for col, var in column_vars.items() if var.get()]
-    filtered_data = filtered_data[selected_columns]
-
-    # Automatically save the filtered DataFrame to a new CSV file
-    output_file = "filtered_data.csv"
-    filtered_data.to_csv(output_file, index=False)
-    messagebox.showinfo("Success", f"Filtered CSV has been saved as {output_file}.")
-    root.destroy()
-
-def setup_gui(df):
-    root = tk.Tk()
-    root.title("CSV Filter and Export Tool")
-
-    # Scrollable Frame for Date Checkboxes
-    date_frame = ttk.LabelFrame(root, text="Select Dates")
-    date_frame.grid(row=0, column=0, padx=10, pady=10, sticky='ew')
-    scrollable_date_frame = create_scrollable_frame(date_frame)
-
-    # Scrollable Frame for Column Checkboxes
-    column_frame = ttk.LabelFrame(root, text="Select Columns")
-    column_frame.grid(row=1, column=0, padx=10, pady=10, sticky='ew')
-    scrollable_column_frame = create_scrollable_frame(column_frame)
-
-    # Load data and create checkboxes
-    date_vars = create_date_checkboxes(df, scrollable_date_frame)
-    column_vars = create_column_checkboxes(df, scrollable_column_frame)
-
-    # Submit Button for filtering data
-    ttk.Button(root, text="Filter Data", command=lambda: filter_data(df, date_vars, column_vars, root)).grid(row=2, column=0, padx=10, pady=10)
-
-    root.mainloop()
-
-if __name__ == "__main__":
-    df = load_csv()
-    setup_gui(df)
-
-
+    # If there are hits, delete them
+    if total_hits > 0:
+        try:
+            delete_response = client.delete_by_query(index=index_name, body=query, refresh=True)
+            print("Deleted records count:", delete_response['deleted'])
+        except exceptions.NotFoundError:
+            print("Error: The resource was not found.")
+        except Exception as e:
+            print("An error occurred:", str(e))
+    else:
+        print("No records to delete.")
 
