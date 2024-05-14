@@ -56,3 +56,93 @@ for i in range(num_segments):
     print(f"Exported {segment_filename}")
 
 
+
+
+
+
+import pandas as pd
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter import ttk
+
+class CSVFilterApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("CSV Filter and Export Tool")
+
+        # Load CSV Button
+        ttk.Button(self.root, text="Load CSV", command=self.load_csv).grid(row=0, column=0, padx=10, pady=10)
+
+        # Frame for Date Checkboxes
+        self.date_frame = ttk.LabelFrame(self.root, text="Select Dates")
+        self.date_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky='ew')
+        self.date_vars = {}
+
+        # Frame for Column Checkboxes
+        self.column_frame = ttk.LabelFrame(self.root, text="Select Columns")
+        self.column_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky='ew')
+        self.column_vars = {}
+
+        # Submit Button for filtering data
+        ttk.Button(self.root, text="Filter Data", command=self.filter_data).grid(row=3, column=0, columnspan=2, padx=10, pady=10)
+
+    def load_csv(self):
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+        if not file_path:
+            return
+        self.df = pd.read_csv(file_path)
+
+        # Process dates for checkboxes
+        self.show_date_checkboxes()
+        self.show_column_checkboxes()
+
+    def show_date_checkboxes(self):
+        # Clear previous checkboxes if any
+        for widget in self.date_frame.winfo_children():
+            widget.destroy()
+
+        # Create checkboxes for each unique date
+        unique_dates = sorted(self.df['Date'].unique())
+        for date in unique_dates:
+            var = tk.BooleanVar()
+            chk = ttk.Checkbutton(self.date_frame, text=date, variable=var)
+            chk.pack(anchor='w')
+            self.date_vars[date] = var
+
+    def show_column_checkboxes(self):
+        # Clear previous checkboxes if any
+        for widget in self.column_frame.winfo_children():
+            widget.destroy()
+
+        # Create new checkboxes for each column in the DataFrame
+        for column in self.df.columns:
+            var = tk.BooleanVar()
+            chk = ttk.Checkbutton(self.column_frame, text=column, variable=var)
+            chk.pack(anchor='w')
+            self.column_vars[column] = var
+
+    def filter_data(self):
+        # Filter data based on selected dates
+        selected_dates = [date for date, var in self.date_vars.items() if var.get()]
+        mask = self.df['Date'].isin(selected_dates)
+        filtered_data = self.df.loc[mask]
+
+        # Filter data based on selected columns
+        selected_columns = [col for col, var in self.column_vars.items() if var.get()]
+        filtered_data = filtered_data[selected_columns]
+
+        # Save the filtered DataFrame to a new CSV file
+        output_file = filedialog.asksaveasfilename(filetypes=[("CSV files", "*.csv")], defaultextension=".csv")
+        if output_file:
+            filtered_data.to_csv(output_file, index=False)
+            messagebox.showinfo("Success", "Filtered CSV has been saved.")
+
+def main():
+    root = tk.Tk()
+    app = CSVFilterApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
+
+
