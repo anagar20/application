@@ -57,108 +57,127 @@ for i in range(num_segments):
 
 
 
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 
+def calculate_optical_flow(video_path):
+    cap = cv2.VideoCapture(video_path)
+    
+    ret, prev_frame = cap.read()
+    if not ret:
+        print("Failed to read video")
+        return []
+    
+    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+    motion_magnitudes = []
 
-import logging
-from opensearchpy import OpenSearch, exceptions
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-class OpenSearchIndexManager:
-    def __init__(self, host, port, username, password, index_name):
-        self.host = host
-        self.port = port
-        self.auth = (username, password)
-        self.index_name = index_name
-        self.client = self._create_client()
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        magnitude, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        mean_magnitude = np.mean(magnitude)
+        motion_magnitudes.append(mean_magnitude)
 
-    def _create_client(self):
-        return OpenSearch(
-            hosts=[{'host': self.host, 'port': self.port}],
-            http_auth=self.auth,
-            use_ssl=True,
-            verify_certs=True,
-            ssl_assert_hostname=False,
-            ssl_show_warn=False,
-            http_compress=True
-        )
+        prev_gray = gray
 
-    def create_index(self, index_body):
-        if self.client.indices.exists(index=self.index_name):
-            self.logger.info(f"Index {self.index_name} already exists.")
-            return
-        try:
-            response = self.client.indices.create(index=self.index_name, body=index_body)
-            self.logger.info("Index created successfully.")
-            self.logger.debug(f"Response: {response}")
-        except exceptions.RequestError as e:
-            self.logger.error(f"Request Error: {e.info}")
-        except exceptions.ConnectionError as e:
-            self.logger.error(f"Connection Error: {e.info}")
-        except Exception as e:
-            self.logger.error(f"An unexpected error occurred: {str(e)}")
+    cap.release()
+    return motion_magnitudes
 
-    def delete_index(self):
-        try:
-            response = self.client.indices.delete(index=self.index_name)
-            self.logger.info("Index deleted successfully.")
-            self.logger.debug(f"Response: {response}")
-        except exceptions.NotFoundError:
-            self.logger.error("Index not found.")
-        except exceptions.RequestError as e:
-            self.logger.error(f"Request Error: {e.info}")
-        except Exception as e:
-            self.logger.error(f"An unexpected error occurred: {str(e)}")
+def identify_slow_motion_sections(motion_magnitudes, threshold_factor=0.5, smoothing_window=5):
+    avg_motion = np.mean(motion_magnitudes)
+    slow_motion_threshold = avg_motion * threshold_factor
+    
+    # Apply smoothing
+    smoothed_magnitudes = np.convolve(motion_magnitudes, np.ones(smoothing_window)/smoothing_window, mode='same')
+    
+    slow_motion_sections = []
 
-    def query_index(self, query):
-        try:
-            response = self.client.search(index=self.index_name, body={"query": query})
-            self.logger.info(f"Query executed successfully.")
-            return response
-        except exceptions.RequestError as e:
-            self.logger.error(f"Request Error: {e.info}")
-        except exceptions.ConnectionError as e:
-            self.logger.error(f"Connection Error: {e.info}")
-        except Exception as e:
-            self.logger.error(f"An unexpected error occurred: {str(e)}")
-            return None
+    for i, magnitude in enumerate(smoothed_magnitudes):
+        if magnitude < slow_motion_threshold:
+            slow_motion_sections.append(i)
 
-    def delete_documents_by_query(self, query):
-        try:
-            response = self.client.delete_by_query(index=self.index_name, body={"query": query}, refresh=True)
-            self.logger.info(f"Documents deleted successfully. Total deleted: {response['deleted']}")
-        except exceptions.RequestError as e:
-            self.logger.error(f"Request Error: {e.info}")
-        except exceptions.ConnectionError as e:
-            self.logger.error(f"Connection Error: {e.info}")
-        except Exception as e:
-            self.logger.error(f"An unexpected error occurred: {str(e)}")
+    return slow_motion_sections, smoothed_magnitudes
 
-    def get_opensearch_version(self):
-        try:
-            info = self.client.info()
-            version = info['version']['number']
-            self.logger.info(f"OpenSearch version: {version}")
-            return version
-        except Exception as e:
-            self.logger.error(f"Failed to retrieve OpenSearch version: {str(e)}")
-            return None
+def plot_motion_magnitudes(motion_magnitudes, smoothed_magnitudes, slow_motion_sections):
+    plt.figure(figsize=(10, 5))
+    plt.plot(motion_magnitudes, label='Original Motion Magnitude')
+    plt.plot(smoothed_magnitudes, label='Smoothed Motion Magnitude', linestyle='--')
+    plt.scatter(slow_motion_sections, [smoothed_magnitudes[i] for i in slow_motion_sections], color='red', label='Slow Motion', zorder=2)
+    plt.xlabel('Frame Number')
+    plt.ylabel('Mean Motion Magnitude')
+    plt.title('Motion Magnitude and Slow Motion Sections')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
-# Example usage of the class:
 if __name__ == "__main__":
-    index_manager = OpenSearchIndexManager(
-        host='https://your-opensearch-cluster-endpoint',
-        port=443,
-        username='your_username',
-        password='your_password',
-        index_name='your_index_name'
-    )
+    video_path = "path/to/your/video.mp4"  # Change this to your video file path
+    motion_magnitudes = calculate_optical_flow(video_path)
+    slow_motion_sections, smoothed_magnitudes = identify_slow_motion_sections(motion_magnitudes)
+    plot_motion_magnitudes(motion_magnitudes, smoothed_magnitudes, slow_motion_sections)
 
-    # Assuming index is already created, here's how you could query and delete documents:
-    query = {"match": {"face_string": "example"}}
-    # Query the index
-    search_results = index_manager.query_index(query)
-    print(search_results)
 
-    # Delete documents matching the query
-    index_manager.delete_documents_by_query(query)
+import torch
+import torchvision.transforms as transforms
+import torchvision.models as models
+from torchvision.io import read_video
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+
+# Load pre-trained model
+model = models.video.r3d_18(pretrained=True)
+model = model.eval()
+
+# Video transformation
+transform = transforms.Compose([
+    transforms.Resize((112, 112)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
+def extract_features(video_path, segment_duration=1, fps=30):
+    video, _, info = read_video(video_path)
+    video = video.permute(0, 3, 1, 2)  # Convert to (T, C, H, W)
+    frame_count = video.shape[0]
+    segment_size = segment_duration * fps
+    
+    features = []
+    for i in range(0, frame_count, segment_size):
+        segment = video[i:i+segment_size]
+        if segment.shape[0] < segment_size:
+            continue
+        
+        segment = torch.stack([transform(frame) for frame in segment])
+        segment = segment.unsqueeze(0)  # Add batch dimension
+        
+        with torch.no_grad():
+            feature = model(segment)
+            features.append(feature.squeeze().cpu().numpy())
+    
+    return np.array(features)
+
+def classify_segments(features, n_clusters=2):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(features)
+    return kmeans.labels_
+
+def plot_classification(labels):
+    plt.figure(figsize=(10, 5))
+    plt.plot(labels, marker='o', linestyle='-')
+    plt.xlabel('Segment Number')
+    plt.ylabel('Cluster Label')
+    plt.title('Video Segment Classification')
+    plt.grid(True)
+    plt.show()
+
+if __name__ == "__main__":
+    video_path = "path/to/your/video.mp4"  # Change this to your video file path
+    features = extract_features(video_path)
+    labels = classify_segments(features)
+    plot_classification(labels)
+
