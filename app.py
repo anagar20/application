@@ -126,13 +126,12 @@ import torch
 import torchvision.transforms as transforms
 import torchvision.models as models
 from torchvision.io import read_video
+from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 
 # Load pre-trained model
 model = models.video.r3d_18(pretrained=True)
-model = model.eval()
+model.eval()
 
 # Video transformation
 transform = transforms.Compose([
@@ -153,7 +152,8 @@ def extract_features(video_path, segment_duration=1, fps=30):
         if segment.shape[0] < segment_size:
             continue
         
-        segment = torch.stack([transform(frame) for frame in segment])
+        # Convert each frame in the segment to PIL Image, then apply transforms
+        segment = torch.stack([transform(Image.fromarray(frame.permute(1, 2, 0).numpy())) for frame in segment])
         segment = segment.unsqueeze(0)  # Add batch dimension
         
         with torch.no_grad():
@@ -161,6 +161,9 @@ def extract_features(video_path, segment_duration=1, fps=30):
             features.append(feature.squeeze().cpu().numpy())
     
     return np.array(features)
+
+# Assuming additional code follows here for classification and plotting...
+
 
 def classify_segments(features, n_clusters=2):
     kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(features)
