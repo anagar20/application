@@ -1,0 +1,111 @@
+import httpx
+import base64
+import time
+import asyncio
+import statistics
+import matplotlib.pyplot as plt
+from typing import List
+
+# Define the endpoints
+UPLOAD_IMAGE_ENDPOINT = "http://127.0.0.1:8000/upload_image"
+UPLOAD_BASE64_ENDPOINT = "http://127.0.0.1:8000/upload_base64"
+UPLOAD_S3_ENDPOINT = "http://127.0.0.1:8000/upload_s3"
+
+# Define test parameters
+NUM_ITERATIONS = 50
+IMAGE_FILE_PATH = "path/to/your/image.jpg"
+S3_BUCKET_NAME = "your-s3-bucket"
+S3_IMAGE_PATH = "path/to/your/image/in/s3.jpg"
+
+async def test_upload_image(client: httpx.AsyncClient):
+    times = []
+    status_codes = []
+
+    for _ in range(NUM_ITERATIONS):
+        start_time = time.time()
+        with open(IMAGE_FILE_PATH, "rb") as file:
+            files = {"file": file}
+            response = await client.post(UPLOAD_IMAGE_ENDPOINT, files=files)
+        end_time = time.time()
+        times.append(end_time - start_time)
+        status_codes.append(response.status_code)
+
+    return times, status_codes
+
+async def test_upload_base64(client: httpx.AsyncClient):
+    times = []
+    status_codes = []
+
+    with open(IMAGE_FILE_PATH, "rb") as file:
+        encoded_string = base64.b64encode(file.read()).decode('utf-8')
+
+    for _ in range(NUM_ITERATIONS):
+        start_time = time.time()
+        response = await client.post(UPLOAD_BASE64_ENDPOINT, json={"image_base64": encoded_string})
+        end_time = time.time()
+        times.append(end_time - start_time)
+        status_codes.append(response.status_code)
+
+    return times, status_codes
+
+async def test_upload_s3(client: httpx.AsyncClient):
+    times = []
+    status_codes = []
+
+    payload = {"bucket": S3_BUCKET_NAME, "path": S3_IMAGE_PATH}
+
+    for _ in range(NUM_ITERATIONS):
+        start_time = time.time()
+        response = await client.post(UPLOAD_S3_ENDPOINT, json=payload)
+        end_time = time.time()
+        times.append(end_time - start_time)
+        status_codes.append(response.status_code)
+
+    return times, status_codes
+
+def plot_response_times(image_times, base64_times, s3_times):
+    plt.figure(figsize=(10, 6))
+    plt.plot(image_times, label='Image Upload', color='blue')
+    plt.plot(base64_times, label='Base64 Upload', color='green')
+    plt.plot(s3_times, label='S3 Upload', color='red')
+    plt.xlabel('Iteration')
+    plt.ylabel('Response Time (seconds)')
+    plt.title('Response Times for Different Endpoints')
+    plt.legend()
+    plt.show()
+
+async def main():
+    async with httpx.AsyncClient() as client:
+        # Test image upload
+        image_times, image_status_codes = await test_upload_image(client)
+        # Test base64 upload
+        base64_times, base64_status_codes = await test_upload_base64(client)
+        # Test S3 upload
+        s3_times, s3_status_codes = await test_upload_s3(client)
+
+        # Print metrics for image upload
+        print("Image Upload:")
+        print(f"Mean Response Time: {statistics.mean(image_times):.4f} seconds")
+        print(f"Median Response Time: {statistics.median(image_times):.4f} seconds")
+        print(f"Response Time Std Dev: {statistics.stdev(image_times):.4f} seconds")
+        print(f"Status Codes: {image_status_codes}\n")
+
+        # Print metrics for base64 upload
+        print("Base64 Upload:")
+        print(f"Mean Response Time: {statistics.mean(base64_times):.4f} seconds")
+        print(f"Median Response Time: {statistics.median(base64_times):.4f} seconds")
+        print(f"Response Time Std Dev: {statistics.stdev(base64_times):.4f} seconds")
+        print(f"Status Codes: {base64_status_codes}\n")
+
+        # Print metrics for S3 upload
+        print("S3 Upload:")
+        print(f"Mean Response Time: {statistics.mean(s3_times):.4f} seconds")
+        print(f"Median Response Time: {statistics.median(s3_times):.4f} seconds")
+        print(f"Response Time Std Dev: {statistics.stdev(s3_times):.4f} seconds")
+        print(f"Status Codes: {s3_status_codes}\n")
+
+        # Plot response times
+        plot_response_times(image_times, base64_times, s3_times)
+
+if __name__ == "__main__":
+    asyncio.run(main())
