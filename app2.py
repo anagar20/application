@@ -498,89 +498,95 @@ import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-class OpenSearchClient:
-    def __init__(self, host, port, username, password):
-        self.client = OpenSearch(
-            hosts=[{'host': host, 'port': port}],
-            http_auth=HTTPBasicAuth(username, password),
-            use_ssl=True,
-            verify_certs=True,
-            connection_class=RequestsHttpConnection
-        )
+from opensearchpy import OpenSearch, RequestsHttpConnection, NotFoundError
+from requests.auth import HTTPBasicAuth
+import hashlib
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def fetch_all_documents(self, index_name):
-        query = {
-            "query": {
-                "match_all": {}
-            }
+# Configuration
+opensearch_host = 'your-opensearch-endpoint'  # This should be the endpoint of your OpenSearch serverless cluster
+opensearch_port = 443  # Typically, OpenSearch uses port 443 for secure connections
+username = 'your-username'  # OpenSearch serverless might not use traditional username/password, prefer IAM roles
+password = 'your-password'  # For serverless, consider using AWS Signature Version 4 (IAM roles)
+index_name = 'vector-index'
+
+# Initialize OpenSearch client
+client = OpenSearch(
+    hosts=[{'host': opensearch_host, 'port': opensearch_port}],
+    # AWS Signature Version 4 might be needed for serverless
+    http_auth=HTTPBasicAuth(username, password),  # Replace with SigV4Auth for serverless
+    use_ssl=True,
+    verify_certs=True,
+    connection_class=RequestsHttpConnection
+)
+
+def fetch_all_documents(index_name):
+    query = {
+        "query": {
+            "match_all": {}
         }
-        return self.client.search(index=index_name, body=query, scroll='1m', size=1000)
+    }
+    return client.search(index=index_name, body=query, scroll='1m', size=1000)
 
-    def scroll_search(self, scroll_id):
-        return self.client.scroll(scroll_id=scroll_id, scroll='1m')
+def scroll_search(scroll_id):
+    try:
+        return client.scroll(scroll_id=scroll_id, scroll='1m')
+    except NotFoundError:
+        return None
 
-    def bulk_delete_documents(self, index_name, doc_ids):
-        actions = [{"delete": {"_index": index_name, "_id": doc_id}} for doc_id in doc_ids]
-        return self.client.bulk(body=actions)
+def bulk_delete_documents(index_name, doc_ids):
+    actions = [{"delete": {"_index": index_name, "_id": doc_id}} for doc_id in doc_ids]
+    return client.bulk(body=actions)
 
-    def _calculate_hash(self, vector):
-        vector_str = json.dumps(vector, sort_keys=True)
-        return hashlib.sha256(vector_str.encode('utf-8')).hexdigest()
+def _calculate_hash(vector):
+    vector_str = json.dumps(vector, sort_keys=True)
+    return hashlib.sha256(vector_str.encode('utf-8')).hexdigest()
 
-    def process_batch(self, index_name, hits, seen_hashes):
-        to_delete = []
-        for hit in hits:
-            doc_id = hit['_id']
-            vector = hit['_source'].get('vector')
+def process_batch(index_name, hits, seen_hashes):
+    to_delete = []
+    for hit in hits:
+        doc_id = hit['_id']
+        vector = hit['_source'].get('vector')
 
-            if vector is None:
-                continue
+        if vector is None:
+            continue
 
-            doc_hash = self._calculate_hash(vector)
-            if doc_hash in seen_hashes:
-                to_delete.append(doc_id)
-            else:
-                seen_hashes.add(doc_hash)
+        doc_hash = _calculate_hash(vector)
+        if doc_hash in seen_hashes:
+            to_delete.append(doc_id)
+        else:
+            seen_hashes.add(doc_hash)
 
-        if to_delete:
-            self.bulk_delete_documents(index_name, to_delete)
-        return len(to_delete)
+    if to_delete:
+        bulk_delete_documents(index_name, to_delete)
+    return len(to_delete)
 
-    def remove_duplicates(self, index_name):
-        response = self.fetch_all_documents(index_name)
-        scroll_id = response['_scroll_id']
-        hits = response['hits']['hits']
+def remove_duplicates(index_name):
+    response = fetch_all_documents(index_name)
+    scroll_id = response['_scroll_id']
+    hits = response['hits']['hits']
 
-        seen_hashes = set()
-        total_deleted = 0
+    seen_hashes = set()
+    total_deleted = 0
 
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = []
-            while hits:
-                futures.append(executor.submit(self.process_batch, index_name, hits, seen_hashes))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        while hits:
+            futures.append(executor.submit(process_batch, index_name, hits, seen_hashes))
 
-                response = self.scroll_search(scroll_id)
-                scroll_id = response['_scroll_id']
-                hits = response['hits']['hits']
+            response = scroll_search(scroll_id)
+            if response is None:
+                break
+            scroll_id = response['_scroll_id']
+            hits = response['hits']['hits']
 
-            for future in as_completed(futures):
-                total_deleted += future.result()
+        for future in as_completed(futures):
+            total_deleted += future.result()
 
-        return total_deleted
+    return total_deleted
 
 if __name__ == "__main__":
-    host = 'your-opensearch-endpoint'
-    port = 443
-    username = 'your-username'
-    password = 'your-password'
-
-    client = OpenSearchClient(host, port, username, password)
-
-    index_name = 'vector-index'
-    deleted_count = client.remove_duplicates(index_name)
+    deleted_count = remove_duplicates(index_name)
     print(f"Total duplicates removed: {deleted_count}")
 
-
-
-if __name__ == "__main__":
-    app()
