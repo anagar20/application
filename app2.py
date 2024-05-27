@@ -590,3 +590,42 @@ if __name__ == "__main__":
     deleted_count = remove_duplicates(index_name)
     print(f"Total duplicates removed: {deleted_count}")
 
+
+from fastapi import BackgroundTasks, FastAPI
+import requests
+from time import sleep
+
+app = FastAPI()
+
+url = 'https://httpbin.org/post'  # Replace with your actual URL
+data = {'key': 'value'}
+connection_timeout = None  # No timeout for connection
+read_timeout = 27  # Set the read timeout to your desired value
+
+def send_post_request(url, data, connection_timeout, read_timeout, retries=3):
+    for i in range(retries):
+        try:
+            response = requests.post(url, data=data, timeout=(connection_timeout, read_timeout))
+            response.raise_for_status()  # Raises an HTTPError if the status code is 4xx, 5xx
+            print(f"Successfully sent request: {response.status_code}")
+            return response
+        except requests.exceptions.Timeout:
+            print("The request timed out")
+        except requests.exceptions.HTTPError as errh:
+            print(f"HTTP Error: {errh}")
+            break
+        except requests.exceptions.ConnectionError as errc:
+            print(f"Error Connecting: {errc}")
+        except requests.exceptions.RequestException as err:
+            print(f"Error: {err}")
+        print(f"Retrying... ({i+1}/{retries})")
+        sleep(5)  # Wait before retrying
+
+@app.post("/start-task/")
+async def start_task(data: dict, background_tasks: BackgroundTasks):
+    background_tasks.add_task(send_post_request, url, data, connection_timeout, read_timeout)
+    return {"message": "Task started"}
+
+# Run the FastAPI application using the command below:
+# uvicorn main:app --reload
+
