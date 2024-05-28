@@ -590,10 +590,10 @@ if __name__ == "__main__":
     deleted_count = remove_duplicates(index_name)
     print(f"Total duplicates removed: {deleted_count}")
 
-
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import FastAPI
 import requests
 from time import sleep
+import threading
 
 app = FastAPI()
 
@@ -622,9 +622,15 @@ def send_post_request(url, data, connection_timeout, read_timeout, retries=3):
         sleep(5)  # Wait before retrying
 
 @app.post("/start-task/")
-async def start_task(data: dict, background_tasks: BackgroundTasks):
-    background_tasks.add_task(send_post_request, url, data, connection_timeout, read_timeout)
+async def start_task(data: dict):
+    # Start a new thread for the background task
+    thread = threading.Thread(target=send_post_request, args=(url, data, connection_timeout, read_timeout))
+    thread.start()
     return {"message": "Task started"}
+
+# Run the FastAPI application using the command below:
+# uvicorn main:app --reload
+
 
 # Run the FastAPI application using the command below:
 # uvicorn main:app --reload
